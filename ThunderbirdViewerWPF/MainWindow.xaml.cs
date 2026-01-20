@@ -43,7 +43,7 @@
             DataContext = this;
         }
 
-        public ObservableCollection<MailFolder> ImapFolders { get; }
+        public ObservableCollection<MailFolder> ImapFolders { get; } = new();
         public ObservableCollection<ThunderbirdProfile> Profiles { get; }
         public ObservableCollection<ThunderbirdAccount> Accounts { get; }
         public ObservableCollection<MailMessageModel> Messages { get; }
