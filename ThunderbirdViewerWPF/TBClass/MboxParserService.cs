@@ -3,50 +3,52 @@
     using System.IO;
     using System.Text;
 
+    using MimeKit;
+
     public class MboxParserService
     {
         public IEnumerable<MailMessageModel> Parse(string mboxFile)
         {
-            if (File.Exists(mboxFile) == false)
+            using var stream = File.OpenRead(mboxFile);
+            var parser = new MimeParser(stream, MimeFormat.Mbox);
+
+            while (!parser.IsEndOfStream)
             {
-                yield break;
+                var message = parser.ParseMessage();
+                yield return ConvertMessage(message);
             }
+        }
 
-            var lines = File.ReadAllLines(mboxFile);
-            MailMessageModel current = null;
-            var body = new StringBuilder();
-
-            foreach (var line in lines)
+        private MailMessageModel ConvertMessage(MimeMessage message)
+        {
+            var model = new MailMessageModel
             {
-                if (line.StartsWith("From "))
+                From = message.From.ToString(),
+                To = message.To.ToString(),
+                Subject = message.Subject,
+                Date = message.Date.LocalDateTime,
+                Body = message.TextBody ?? message.HtmlBody
+            };
+
+            // Anhänge extrahieren
+            foreach (var attachment in message.Attachments)
+            {
+                if (attachment is MimePart part)
                 {
-                    if (current != null)
+                    using var ms = new MemoryStream();
+                    part.Content.DecodeTo(ms);
+
+                    model.Attachments.Add(new MailAttachment
                     {
-                        current.Body = body.ToString();
-                        yield return current;
-                    }
-
-                    current = new MailMessageModel();
-                    body.Clear();
+                        FileName = part.FileName,
+                        ContentType = part.ContentType.MimeType,
+                        Size = ms.Length,
+                        Content = ms.ToArray()
+                    });
                 }
-                else if (line.StartsWith("Subject:"))
-                    current.Subject = line.Substring(8).Trim();
-                else if (line.StartsWith("From:"))
-                    current.From = line.Substring(5).Trim();
-                else if (line.StartsWith("To:"))
-                    current.To = line.Substring(3).Trim();
-                else if (line.StartsWith("Date:") &&
-                         DateTime.TryParse(line.Substring(5), out var date))
-                    current.Date = date;
-                else
-                    body.AppendLine(line);
             }
 
-            if (current != null)
-            {
-                current.Body = body.ToString();
-                yield return current;
-            }
+            return model;
         }
     }
 }

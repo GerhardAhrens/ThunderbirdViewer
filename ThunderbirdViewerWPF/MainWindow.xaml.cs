@@ -2,9 +2,14 @@
 {
     using System.Collections.ObjectModel;
     using System.ComponentModel;
+    using System.Diagnostics;
+    using System.IO;
     using System.Runtime.CompilerServices;
     using System.Windows;
     using System.Windows.Controls;
+    using System.Windows.Input;
+
+    using MimeKit;
 
     /// <summary>
     /// Interaction logic for MainWindow.xaml
@@ -12,6 +17,7 @@
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
+        public ICommand OpenAttachmentCommand => new RelayCommand<MailAttachment>(this.OpenAttachment);
 
         // Services
         private readonly ThunderbirdProfileService _profileService = new();
@@ -23,6 +29,8 @@
         private ThunderbirdProfile _selectedProfile;
         private ThunderbirdAccount _selectedAccount;
         private MailFolder _selectedFolder;
+        private MailMessageModel _selectedMessage;
+
         private string _searchText;
         private List<MailMessageModel> _allMessages = new();
 
@@ -116,6 +124,16 @@
 
                     this.LoadMessagesFromFolder();
                 }
+            }
+        }
+
+        public MailMessageModel SelectedMessage
+        {
+            get => this._selectedMessage;
+            set
+            {
+                this._selectedMessage = value;
+                this.OnPropertyChanged();
             }
         }
 
@@ -232,6 +250,37 @@
                 (mail.Body?.Contains(this.SearchText, StringComparison.OrdinalIgnoreCase) == true);
         }
 
+        private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (DataContext is MainWindow @this)
+            {
+                @this.SelectedFolder = e.NewValue as MailFolder;
+            }
+        }
+
+        private bool CanOpenAttachment(MailAttachment obj)
+        {
+            return true;
+        }
+
+        private void OpenAttachment(MailAttachment attachment)
+        {
+            if (attachment == null)
+            {
+                return;
+            }
+
+            var tempFile = Path.Combine(Path.GetTempPath(), attachment.FileName);
+
+            File.WriteAllBytes(tempFile, attachment.Content);
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = tempFile,
+                UseShellExecute = true
+            });
+        }
+
         #region INotifyPropertyChanged implementierung
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = "")
         {
@@ -246,12 +295,13 @@
         }
         #endregion INotifyPropertyChanged implementierung
 
-        private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
-        {
-            if (DataContext is MainWindow @this)
-            {
-                @this.SelectedFolder = e.NewValue as MailFolder;
-            }
-        }
+    }
+
+    public class MailAttachment
+    {
+        public string FileName { get; set; }
+        public string ContentType { get; set; }
+        public long Size { get; set; }
+        public byte[] Content { get; set; }
     }
 }

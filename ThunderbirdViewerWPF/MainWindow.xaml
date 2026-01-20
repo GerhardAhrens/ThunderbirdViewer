@@ -13,6 +13,10 @@
         <BitmapImage UriSource="pack://application:,,,/Resources/Picture/ApplicationIcon.png" />
     </Window.Icon>
 
+    <Window.Resources>
+        <local:FolderHeaderConverter x:Key="FolderHeaderConverter" />
+        <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    </Window.Resources>
     <Grid x:Name="gridMain">
         <Grid.RowDefinitions>
             <RowDefinition Height="35" />
@@ -23,15 +27,28 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Button
-            x:Name="BtnCloseApplication"
+        <StackPanel
             Grid.Row="0"
             Grid.Column="0"
-            Width="30"
-            Height="30"
-            HorizontalAlignment="Left">
-            <Image Source="{StaticResource ResourceKey=IconApplicationExit2}" Stretch="None" />
-        </Button>
+            Orientation="Horizontal">
+            <Button
+                x:Name="BtnCloseApplication"
+                Width="30"
+                Height="30"
+                HorizontalAlignment="Left">
+                <Image Source="{StaticResource ResourceKey=IconApplicationExit2}" Stretch="None" />
+            </Button>
+
+            <Button
+                Width="30"
+                Height="30"
+                Margin="5,0,0,0"
+                HorizontalAlignment="Left"
+                Command="{Binding DataContext.OpenAttachmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                CommandParameter="{Binding}"
+                Content="Öffnen" />
+
+        </StackPanel>
 
         <Rectangle
             Grid.Row="0"
@@ -111,11 +128,13 @@
                 <!--  Message List  -->
                 <Grid Grid.Column="1">
                     <DataGrid
-                        AutoGenerateColumns="False" Margin="5,0,5,5"
+                        Margin="5,0,5,5"
+                        AutoGenerateColumns="False"
                         GridLinesVisibility="Horizontal"
                         HeadersVisibility="Column"
                         IsReadOnly="True"
                         ItemsSource="{Binding Path=Messages}"
+                        SelectedItem="{Binding Path=SelectedMessage}"
                         SelectionMode="Single"
                         VirtualizingPanel.IsVirtualizing="True"
                         VirtualizingPanel.VirtualizationMode="Recycling">
@@ -126,10 +145,23 @@
                                 Binding="{Binding Path=Date}"
                                 Header="Datum" />
 
-                            <DataGridTextColumn
-                                Width="260"
-                                Binding="{Binding Path=DisplayAddress}"
-                                Header="Kontakt" />
+                            <DataGridTextColumn Width="260" Binding="{Binding DisplayAddress}">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Text="{Binding DataContext.SelectedFolder.Name, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource FolderHeaderConverter}}" />
+                                </DataGridTextColumn.Header>
+                            </DataGridTextColumn>
+
+                            <DataGridTemplateColumn Width="40" Header="📎">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            HorizontalAlignment="Center"
+                                            FontSize="14"
+                                            Text="📎"
+                                            Visibility="{Binding HasAttachments, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
 
                             <DataGridTextColumn
                                 Width="*"
