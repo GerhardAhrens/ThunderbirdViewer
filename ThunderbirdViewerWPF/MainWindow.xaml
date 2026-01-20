@@ -6,12 +6,13 @@
     xmlns:local="clr-namespace:ThunderbirdViewerWPF"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     Title="{Binding Path=WindowTitel, FallbackValue=~WindowTitel}"
-    Width="800"
-    Height="450"
+    Width="900"
+    Height="600"
     mc:Ignorable="d">
     <Window.Icon>
         <BitmapImage UriSource="pack://application:,,,/Resources/Picture/ApplicationIcon.png" />
     </Window.Icon>
+
     <Grid x:Name="gridMain">
         <Grid.RowDefinitions>
             <RowDefinition Height="35" />
@@ -39,13 +40,105 @@
             HorizontalAlignment="Stretch"
             Fill="Black" />
 
-        <TextBlock
-            Grid.Row="1"
-            Grid.Column="0"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            FontSize="24"
-            Text="{Binding Path=WindowTitel, FallbackValue=~WindowTitel}" />
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
+            <!--  =========================  -->
+            <!--  Header / Selection Row  -->
+            <!--  =========================  -->
+            <DockPanel Margin="8" LastChildFill="False">
+
+                <TextBlock
+                    Margin="0,0,5,0"
+                    VerticalAlignment="Center"
+                    Text="Profil:" />
+
+                <ComboBox
+                    Width="220"
+                    Margin="0,0,15,0"
+                    DisplayMemberPath="Name"
+                    ItemsSource="{Binding Path=Profiles}"
+                    SelectedItem="{Binding Path=SelectedProfile}" />
+
+                <TextBlock
+                    Margin="0,0,5,0"
+                    VerticalAlignment="Center"
+                    Text="Konto:" />
+
+                <ComboBox
+                    Width="280"
+                    Margin="0,0,15,0"
+                    DisplayMemberPath="Name"
+                    ItemsSource="{Binding Path=Accounts}"
+                    SelectedItem="{Binding Path=SelectedAccount}" />
+
+                <TextBox
+                    Width="250"
+                    VerticalAlignment="Center"
+                    Text="{Binding Path=SearchText, UpdateSourceTrigger=PropertyChanged}"
+                    ToolTip="Suche nach Betreff, Absender oder Text" />
+            </DockPanel>
+
+            <!--  Main Content  -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="280" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!--  Folder Tree  -->
+                <Border
+                    Grid.Column="0"
+                    Padding="5"
+                    BorderBrush="#DDD"
+                    BorderThickness="0,0,1,0">
+
+                    <TreeView ItemsSource="{Binding ImapFolders}" SelectedItemChanged="TreeView_SelectedItemChanged">
+
+                        <TreeView.ItemTemplate>
+                            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Path=Name}" />
+                                </StackPanel>
+                            </HierarchicalDataTemplate>
+                        </TreeView.ItemTemplate>
+                    </TreeView>
+                </Border>
+
+                <!--  Message List  -->
+                <Grid Grid.Column="1">
+                    <DataGrid
+                        AutoGenerateColumns="False" Margin="5,0,5,5"
+                        GridLinesVisibility="Horizontal"
+                        HeadersVisibility="Column"
+                        IsReadOnly="True"
+                        ItemsSource="{Binding Path=Messages}"
+                        SelectionMode="Single"
+                        VirtualizingPanel.IsVirtualizing="True"
+                        VirtualizingPanel.VirtualizationMode="Recycling">
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn
+                                Width="160"
+                                Binding="{Binding Path=Date}"
+                                Header="Datum" />
+
+                            <DataGridTextColumn
+                                Width="260"
+                                Binding="{Binding Path=DisplayAddress}"
+                                Header="Kontakt" />
+
+                            <DataGridTextColumn
+                                Width="*"
+                                Binding="{Binding Path=Subject}"
+                                Header="Betreff" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Grid>
+        </Grid>
     </Grid>
 </Window>

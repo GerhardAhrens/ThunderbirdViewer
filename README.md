@@ -7,5 +7,13 @@
 
 Mit der Anwendung ist es möglich Thunderbird E-Mail-Dateien (MBOX-Format) anzeigen und durchsuchen. Die Anwendung bietet eine benutzerfreundliche Oberfläche, um E-Mails zu lesen, Anhänge zu verwalten und nach bestimmten Nachrichten zu suchen.
 
+## Dialog Thunderbird (Mail) Viewer
 
-# Noch im Aufbau, bisher nur ein paar Gundfunktionen implementiert.
+<img src="MainDialog.png" style="width:750px;"/></br>
+
+## Features
+- Lesen der Profile
+- Lesen der Konten/Accounts
+- Lesen der E-Mails sowie suchen in den E-Mails
+
+# Noch im Aufbau, bisher nur ein paar Grundfunktionen implementiert.
