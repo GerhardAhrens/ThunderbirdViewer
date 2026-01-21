@@ -4,6 +4,7 @@
     using System.ComponentModel;
     using System.Diagnostics;
     using System.IO;
+    using System.Net.Mail;
     using System.Runtime.CompilerServices;
     using System.Windows;
     using System.Windows.Controls;
@@ -11,19 +12,21 @@
 
     using MimeKit;
 
+    using Windows.Networking.Vpn;
+
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
-        public ICommand OpenAttachmentCommand => new RelayCommand<MailAttachment>(this.OpenAttachment);
 
         // Services
         private readonly ThunderbirdProfileService _profileService = new();
         private readonly ThunderbirdAccountService _accountService = new();
         private readonly ImapFolderService _imapFolderService = new();
         private readonly MboxParserService _mboxParser = new();
+        private readonly MboxParserServiceAsync _mboxParserAsync = new();
 
         // Backing fields
         private ThunderbirdProfile _selectedProfile;
@@ -33,6 +36,11 @@
 
         private string _searchText;
         private List<MailMessageModel> _allMessages = new();
+
+        private CancellationTokenSource _loadCts;
+        private bool _isLoading;
+        private int _progressValue;
+        private int _progressMaximum = 100;
 
         public MainWindow()
         {
@@ -122,7 +130,8 @@
                     this._selectedFolder = value;
                     this.OnPropertyChanged();
 
-                    this.LoadMessagesFromFolder();
+                    //this.LoadMessagesFromFolder();
+                    _ = LoadMessagesFromFolderAsync();
                 }
             }
         }
@@ -137,9 +146,40 @@
             }
         }
 
+        public bool IsLoading
+        {
+            get => this._isLoading;
+            set
+            {
+                this._isLoading = value;
+                this.OnPropertyChanged();
+            }
+        }
+
+        public int ProgressValue
+        {
+            get => this._progressValue;
+            set
+            {
+                this._progressValue = value;
+                this.OnPropertyChanged();
+            }
+        }
+
+        public int ProgressMaximum
+        {
+            get => this._progressMaximum;
+            set
+            {
+                this._progressMaximum = value;
+                this.OnPropertyChanged();
+            }
+        }
+
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
             WeakEventManager<Button, RoutedEventArgs>.AddHandler(BtnCloseApplication, "Click", OnCloseApplication);
+            WeakEventManager<Button, RoutedEventArgs>.AddHandler(BtnAttachmentOpen, "Click", OnAttachmentOpen);
         }
 
         private void OnCloseApplication(object sender, RoutedEventArgs e)
@@ -258,21 +298,24 @@
             }
         }
 
-        private bool CanOpenAttachment(MailAttachment obj)
+        private void OnAttachmentOpen(object? sender, RoutedEventArgs e)
         {
-            return true;
-        }
-
-        private void OpenAttachment(MailAttachment attachment)
-        {
-            if (attachment == null)
+            if (this.SelectedMessage == null || this.SelectedMessage.HasAttachments == false)
             {
                 return;
             }
 
-            var tempFile = Path.Combine(Path.GetTempPath(), attachment.FileName);
+            if (this.SelectedMessage.Attachments.Count == 0)
+            {
+                return;
+            }
 
-            File.WriteAllBytes(tempFile, attachment.Content);
+            string fileName = this.SelectedMessage.Attachments[0].FileName;
+            byte[] content = this.SelectedMessage.Attachments[0].Content;
+
+            var tempFile = Path.Combine(Path.GetTempPath(), fileName);
+
+            File.WriteAllBytes(tempFile, content);
 
             Process.Start(new ProcessStartInfo
             {
@@ -280,6 +323,48 @@
                 UseShellExecute = true
             });
         }
+
+        private async Task LoadMessagesFromFolderAsync()
+        {
+            // vorherigen Ladevorgang abbrechen
+            _loadCts?.Cancel();
+            _loadCts = new CancellationTokenSource();
+
+            Messages.Clear();
+            _allMessages.Clear();
+
+            if (SelectedFolder == null || string.IsNullOrEmpty(SelectedFolder.FilePath))
+                return;
+
+            bool isSentFolder =
+                SelectedFolder.Name.Contains("sent", StringComparison.OrdinalIgnoreCase) ||
+                SelectedFolder.Name.Contains("gesendet", StringComparison.OrdinalIgnoreCase);
+
+            try
+            {
+                IsLoading = true;
+
+                var mails = await _mboxParserAsync.ParseAsync(
+                    SelectedFolder.FilePath,
+                    isSentFolder,
+                    _loadCts.Token);
+
+                _allMessages = mails
+                    .OrderByDescending(m => m.Date)
+                    .ToList();
+
+                ApplySearch();
+            }
+            catch (OperationCanceledException)
+            {
+                // bewusst ignorieren (Ordnerwechsel)
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
 
         #region INotifyPropertyChanged implementierung
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = "")
@@ -297,11 +382,58 @@
 
     }
 
-    public class MailAttachment
+    public class MboxParserServiceAsync
     {
-        public string FileName { get; set; }
-        public string ContentType { get; set; }
-        public long Size { get; set; }
-        public byte[] Content { get; set; }
+        public Task<List<MailMessageModel>> ParseAsync(string mboxFile, bool isSentFolder, CancellationToken token)
+        {
+            return Task.Run(() =>
+            {
+                var result = new List<MailMessageModel>();
+
+                using var stream = File.OpenRead(mboxFile);
+                var parser = new MimeParser(stream, MimeFormat.Mbox);
+
+                while (!parser.IsEndOfStream)
+                {
+                    token.ThrowIfCancellationRequested();
+
+                    var message = parser.ParseMessage();
+
+                    var model = ConvertMessage(message, isSentFolder);
+                    result.Add(model);
+                }
+
+                return result;
+            }, token);
+        }
+
+        private MailMessageModel ConvertMessage(MimeMessage message, bool isSent)
+        {
+            var model = new MailMessageModel
+            {
+                From = message.From.ToString(),
+                To = message.To.ToString(),
+                Subject = message.Subject,
+                Date = message.Date.LocalDateTime,
+                Body = message.TextBody ?? message.HtmlBody,
+                IsSent = isSent
+            };
+
+            foreach (var attachment in message.Attachments.OfType<MimePart>())
+            {
+                using var ms = new MemoryStream();
+                attachment.Content.DecodeTo(ms);
+
+                model.Attachments.Add(new MailAttachment
+                {
+                    FileName = attachment.FileName,
+                    ContentType = attachment.ContentType.MimeType,
+                    Size = ms.Length,
+                    Content = ms.ToArray()
+                });
+            }
+
+            return model;
+        }
     }
 }
