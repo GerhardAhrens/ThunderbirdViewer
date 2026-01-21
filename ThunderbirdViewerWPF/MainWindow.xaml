@@ -180,10 +180,7 @@
                 Height="10"
                 VerticalAlignment="Top"
                 IsIndeterminate="True"
-                Maximum="{Binding Path=ProgressMaximum}"
-                Minimum="0"
-                Visibility="{Binding Path=IsLoading, Converter={StaticResource BoolToVisibilityConverter}}"
-                Value="{Binding Path=ProgressValue}" />
+                Visibility="{Binding Path=IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
         </Grid>
     </Grid>
 </Window>

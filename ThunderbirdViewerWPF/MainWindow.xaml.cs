@@ -4,15 +4,11 @@
     using System.ComponentModel;
     using System.Diagnostics;
     using System.IO;
-    using System.Net.Mail;
     using System.Runtime.CompilerServices;
     using System.Windows;
     using System.Windows.Controls;
-    using System.Windows.Input;
 
     using MimeKit;
-
-    using Windows.Networking.Vpn;
 
     /// <summary>
     /// Interaction logic for MainWindow.xaml
@@ -39,8 +35,6 @@
 
         private CancellationTokenSource _loadCts;
         private bool _isLoading;
-        private int _progressValue;
-        private int _progressMaximum = 100;
 
         public MainWindow()
         {
@@ -152,26 +146,6 @@
             set
             {
                 this._isLoading = value;
-                this.OnPropertyChanged();
-            }
-        }
-
-        public int ProgressValue
-        {
-            get => this._progressValue;
-            set
-            {
-                this._progressValue = value;
-                this.OnPropertyChanged();
-            }
-        }
-
-        public int ProgressMaximum
-        {
-            get => this._progressMaximum;
-            set
-            {
-                this._progressMaximum = value;
                 this.OnPropertyChanged();
             }
         }
@@ -330,8 +304,8 @@
             _loadCts?.Cancel();
             _loadCts = new CancellationTokenSource();
 
-            Messages.Clear();
-            _allMessages.Clear();
+            this.Messages.Clear();
+            this._allMessages.Clear();
 
             if (SelectedFolder == null || string.IsNullOrEmpty(SelectedFolder.FilePath))
                 return;
@@ -342,18 +316,16 @@
 
             try
             {
-                IsLoading = true;
+                this.IsLoading = true;
 
                 var mails = await _mboxParserAsync.ParseAsync(
                     SelectedFolder.FilePath,
                     isSentFolder,
                     _loadCts.Token);
 
-                _allMessages = mails
-                    .OrderByDescending(m => m.Date)
-                    .ToList();
+                this._allMessages = mails.OrderByDescending(m => m.Date).ToList();
 
-                ApplySearch();
+                this.ApplySearch();
             }
             catch (OperationCanceledException)
             {
